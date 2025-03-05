@@ -104,38 +104,53 @@
 svg {
     width: 100%;
     height: 100%;
-    background-color: #fff;
+    background-color: var(--surface);
+    background-image: 
+        radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+    background-size: 40px 40px;
+    background-position: -19px -19px;
 }
 
 /* 节点样式 */
 .node rect,
 .node ellipse,
 .node path {
-    fill: #fff;
-    stroke: #000;
+    fill: var(--surface);
+    stroke: var(--text-color);
     stroke-width: 2px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .node:hover rect,
 .node:hover ellipse,
 .node:hover path {
-    stroke: #4CAF50;
+    stroke: var(--primary-color);
     stroke-width: 3px;
+    filter: drop-shadow(0 4px 8px rgba(33, 150, 243, 0.2));
+    transform: scale(1.02);
 }
 
 .node text {
     font-size: 14px;
+    font-weight: 500;
+    fill: var(--text-color);
     pointer-events: none;
     user-select: none;
 }
 
 /* 连接线样式 */
 line {
-    stroke: #999;
+    stroke: var(--text-light);
     stroke-width: 2px;
     pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+line:hover {
+    stroke: var(--primary-color);
+    stroke-width: 3px;
 }
 
 /* 工具提示 */
@@ -148,14 +163,62 @@ line {
     position: absolute;
     bottom: 100%;
     left: 50%;
-    transform: translateX(-50%);
-    padding: 4px 8px;
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
+    transform: translateX(-50%) translateY(-8px);
+    padding: 6px 12px;
+    background-color: var(--text-color);
+    color: var(--surface);
     font-size: 12px;
-    border-radius: 4px;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
     white-space: nowrap;
     z-index: 1000;
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    animation: tooltip 0.2s ease forwards;
+}
+
+[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    border: 6px solid transparent;
+    border-top-color: var(--text-color);
+    opacity: 0;
+    animation: tooltip 0.2s ease forwards;
+}
+
+@keyframes tooltip {
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* 动画效果 */
+@keyframes nodeAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.node {
+    animation: nodeAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 选中效果 */
+.selected rect,
+.selected ellipse,
+.selected path {
+    stroke: var(--primary-color);
+    stroke-width: 3px;
+    filter: drop-shadow(0 0 8px rgba(33, 150, 243, 0.3));
 }
 
 /* 右侧属性面板 */
@@ -276,5 +339,17 @@ line {
     
     #properties-panel.active {
         transform: translateX(0);
+    }
+
+    .node text {
+        font-size: 12px;
+    }
+
+    [title]:hover::after {
+        display: none;
+    }
+
+    [title]:hover::before {
+        display: none;
     }
 } 

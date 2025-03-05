@@ -1,0 +1,29 @@
+# 项目信息
+
+## 仓库信息
+- 仓库地址：https://github.com/lib-ae/mindmap
+- 部署地址：https://lib-ae.github.io/mindmap/
+
+## 部署说明
+1. 代码已部署在 gh-pages 分支
+2. 使用 GitHub Pages 进行静态部署
+3. 访问地址：https://lib-ae.github.io/mindmap/
+
+## 经验教训
+1. 静态部署时需要修改资源路径为相对路径
+2. 使用 localStorage 存储数据，确保数据隐私性
+3. 部署时需要在 Settings -> Pages 中选择 gh-pages 分支
+
+## 待办事项
+- [√] 完成基础功能开发
+- [√] 部署到 GitHub Pages
+- [√] 测试在线访问
+- [ ] 添加数据导入导出功能
+- [ ] 优化移动端体验
+
+## 系统环境
+- 操作系统：Microsoft Windows 11 (10.0.22631 Build 22631)
+- Python版本：3.9.7 (64位)
+- pip版本：21.2.4
+- Python安装位置：D:\anaconda3\python.exe
+- pip安装位置：D:\anaconda3\lib\site-packages\pip 
