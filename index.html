@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>思维导图</title>
+    <link href="mindmap/static/css/style.css" rel="stylesheet">
+    <style>
+        .mindmap-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .mindmap-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s;
+        }
+
+        .mindmap-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .mindmap-info {
+            flex: 1;
+            margin-bottom: 1rem;
+        }
+
+        .mindmap-title {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .mindmap-date {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .card-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 1rem;
+            color: #666;
+        }
+
+        .empty-state p {
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>思维导图</h1>
+            <button onclick="createMindmap()" class="btn btn-primary">新建思维导图</button>
+        </header>
+
+        <main>
+            <div id="mindmap-list" class="mindmap-list">
+                <!-- 思维导图列表将通过JavaScript动态生成 -->
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // 加载思维导图列表
+        function loadMindmaps() {
+            const mindmapsData = JSON.parse(localStorage.getItem('mindmaps') || '[]');
+            const listContainer = document.getElementById('mindmap-list');
+
+            if (mindmapsData.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-state">
+                        <p>还没有创建任何思维导图</p>
+                        <button onclick="createMindmap()" class="btn btn-primary">创建第一个思维导图</button>
+                    </div>
+                `;
+                return;
+            }
+
+            // 按更新时间排序
+            mindmapsData.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+            listContainer.innerHTML = mindmapsData.map(mindmap => `
+                <div class="mindmap-card">
+                    <div class="mindmap-info">
+                        <div class="mindmap-title">${mindmap.title || '未命名思维导图'}</div>
+                        <div class="mindmap-date">
+                            最后更新: ${new Date(mindmap.updated_at).toLocaleString()}
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button onclick="deleteMindmap('${mindmap.id}')" class="btn btn-sm btn-danger">删除</button>
+                        <button onclick="openMindmap('${mindmap.id}')" class="btn btn-sm btn-primary">打开</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 创建新的思维导图
+        function createMindmap() {
+            const id = Date.now().toString();
+            const mindmap = {
+                id: id,
+                title: '新思维导图',
+                updated_at: new Date().toISOString()
+            };
+
+            // 更新思维导图列表
+            const mindmaps = JSON.parse(localStorage.getItem('mindmaps') || '[]');
+            mindmaps.push(mindmap);
+            localStorage.setItem('mindmaps', JSON.stringify(mindmaps));
+
+            // 打开新创建的思维导图
+            openMindmap(id);
+        }
+
+        // 打开思维导图
+        function openMindmap(id) {
+            window.location.href = `mindmap/templates/mindmap.html?id=${id}`;
+        }
+
+        // 删除思维导图
+        function deleteMindmap(id) {
+            if (!confirm('确定要删除这个思维导图吗？')) {
+                return;
+            }
+
+            // 删除思维导图数据
+            localStorage.removeItem(`mindmap_${id}`);
+
+            // 从列表中移除
+            const mindmaps = JSON.parse(localStorage.getItem('mindmaps') || '[]');
+            const updatedMindmaps = mindmaps.filter(m => m.id !== id);
+            localStorage.setItem('mindmaps', JSON.stringify(updatedMindmaps));
+
+            // 重新加载列表
+            loadMindmaps();
+        }
+
+        // 初始化
+        loadMindmaps();
+    </script>
+</body>
+</html> 

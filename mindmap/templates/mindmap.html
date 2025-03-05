@@ -1,479 +1,297 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>思维导图编辑器</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/mindmap.css') }}">
-    <!-- 引入D3.js库 -->
+    <link href="../static/css/style.css" rel="stylesheet">
+    <link href="../static/css/mindmap.css" rel="stylesheet">
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-    <div class="page-container">
-        <header class="toolbar">
-            <div class="app-info">
-                <a href="{{ url_for('index') }}" class="home-link">返回首页</a>
-                <input type="text" id="mindmap-title" placeholder="输入标题..." />
-            </div>
-            <div class="tools">
-                <button id="add-node-btn" class="tool-btn">添加节点</button>
-                <button id="save-btn" class="tool-btn primary">保存</button>
+    <div class="container">
+        <header>
+            <input type="text" id="mindmap-title" placeholder="输入标题..." class="title-input">
+            <div class="header-actions">
+                <button onclick="saveMindmap()" class="btn btn-primary">保存</button>
+                <button onclick="location.href='../../index.html'" class="btn btn-secondary">返回</button>
             </div>
         </header>
 
-        <main class="mindmap-container">
-            <div id="mindmap-canvas"></div>
-            
-            <!-- 右侧属性面板 -->
-            <div id="properties-panel" class="hidden">
-                <div class="panel-header">
-                    <h3>节点属性</h3>
-                    <button id="close-panel-btn">×</button>
-                </div>
-                <div class="panel-content">
-                    <div class="form-group">
-                        <label for="node-text">文本内容</label>
-                        <input type="text" id="node-text" />
-                    </div>
-                    <div class="form-group">
-                        <label for="node-color">节点颜色</label>
-                        <input type="color" id="node-color" value="#4CAF50" />
-                    </div>
-                    <div class="form-group">
-                        <label for="node-shape">节点形状</label>
-                        <select id="node-shape">
-                            <option value="circle">圆形</option>
-                            <option value="rect">矩形</option>
-                            <option value="roundRect" selected>圆角矩形</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <button id="node-delete-btn" class="button danger">删除节点</button>
-                    </div>
-                </div>
+        <main>
+            <div id="mindmap-container"></div>
+            <div class="toolbar">
+                <button onclick="addNode()" class="btn btn-sm">添加节点</button>
+                <button onclick="deleteSelectedNode()" class="btn btn-sm btn-danger">删除节点</button>
+                <input type="color" id="node-color" onchange="updateNodeColor(this.value)" title="节点颜色">
+                <select id="node-shape" onchange="updateNodeShape(this.value)" title="节点形状">
+                    <option value="rectangle">矩形</option>
+                    <option value="ellipse">椭圆</option>
+                    <option value="diamond">菱形</option>
+                </select>
             </div>
         </main>
-        
-        <div id="status-bar">
-            <span id="status-message"></span>
-            <span id="node-count">节点: 0</span>
-        </div>
-    </div>
-
-    <div id="context-menu" class="context-menu hidden">
-        <ul>
-            <li id="context-add-node">添加子节点</li>
-            <li id="context-edit-node">编辑节点</li>
-            <li id="context-delete-node">删除节点</li>
-        </ul>
     </div>
 
     <script>
-        // 全局变量
-        const mapId = "{{ map_id }}";
-        let mindmapData = {
-            title: "新思维导图",
-            nodes: [],
-            links: []
-        };
+        // 获取URL参数中的mindmap ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const mapId = urlParams.get('id');
+        let mindmapData = null;
         let selectedNode = null;
-        
-        // DOM元素
-        const canvas = d3.select("#mindmap-canvas");
-        const titleInput = document.getElementById("mindmap-title");
-        const saveBtn = document.getElementById("save-btn");
-        const addNodeBtn = document.getElementById("add-node-btn");
-        const propertiesPanel = document.getElementById("properties-panel");
-        const closePanelBtn = document.getElementById("close-panel-btn");
-        const nodeTextInput = document.getElementById("node-text");
-        const nodeColorInput = document.getElementById("node-color");
-        const nodeShapeInput = document.getElementById("node-shape");
-        const nodeDeleteBtn = document.getElementById("node-delete-btn");
-        const statusMessage = document.getElementById("status-message");
-        const nodeCountDisplay = document.getElementById("node-count");
-        const contextMenu = document.getElementById("context-menu");
-        
-        // D3相关变量
-        let width = 0;
-        let height = 0;
-        let svg = null;
-        let simulation = null;
-        let nodeElements = null;
-        let linkElements = null;
-        let textElements = null;
-        
-        // 初始化SVG画布
-        function initSvg() {
-            width = canvas.node().clientWidth;
-            height = canvas.node().clientHeight;
-            
-            svg = canvas.append("svg")
-                .attr("width", "100%")
-                .attr("height", "100%")
-                .attr("viewBox", [-width/2, -height/2, width, height]);
-                
-            // 添加箭头定义
-            svg.append("defs").append("marker")
-                .attr("id", "arrowhead")
-                .attr("viewBox", "0 -5 10 10")
-                .attr("refX", 22) // 调整箭头位置
-                .attr("refY", 0)
-                .attr("markerWidth", 6)
-                .attr("markerHeight", 6)
-                .attr("orient", "auto")
-                .append("path")
-                .attr("d", "M0,-5L10,0L0,5")
-                .attr("fill", "#999");
-            
-            // 创建力导向图布局
-            simulation = d3.forceSimulation()
-                .force("link", d3.forceLink().id(d => d.id).distance(150))
-                .force("charge", d3.forceManyBody().strength(-300))
-                .force("center", d3.forceCenter(0, 0))
-                .on("tick", ticked);
-        }
-        
-        // 更新图形
-        function updateGraph() {
-            // 更新连接线
-            linkElements = svg.selectAll(".link")
-                .data(mindmapData.links)
-                .join("line")
-                .attr("class", "link")
-                .attr("stroke", "#999")
-                .attr("stroke-width", 2)
-                .attr("marker-end", "url(#arrowhead)");
-            
-            // 更新节点形状
-            nodeElements = svg.selectAll(".node")
-                .data(mindmapData.nodes)
-                .join("path")
-                .attr("class", "node")
-                .attr("d", d => getNodePath(d))
-                .attr("fill", d => d.color || "#4CAF50")
-                .attr("stroke", "#fff")
-                .attr("stroke-width", 2)
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended))
-                .on("click", nodeClicked)
-                .on("contextmenu", showContextMenu);
-            
-            // 更新文本标签
-            textElements = svg.selectAll(".node-text")
-                .data(mindmapData.nodes)
-                .join("text")
-                .attr("class", "node-text")
-                .attr("text-anchor", "middle")
-                .attr("dominant-baseline", "middle")
-                .attr("pointer-events", "none")
-                .attr("fill", "#fff")
-                .text(d => d.text);
-            
-            // 更新力导向模拟
-            simulation.nodes(mindmapData.nodes);
-            simulation.force("link").links(mindmapData.links);
-            simulation.alpha(1).restart();
-            
-            // 更新节点计数
-            nodeCountDisplay.textContent = `节点: ${mindmapData.nodes.length}`;
-        }
-        
-        // 获取节点形状路径
-        function getNodePath(node) {
-            const shape = node.shape || "roundRect";
-            const width = Math.max(node.text.length * 10, 80);
-            const height = 40;
-            
-            if (shape === "circle") {
-                const radius = Math.max(width, height) / 2;
-                return d3.symbol().type(d3.symbolCircle).size(radius * radius * 4)();
-            } else if (shape === "rect") {
-                return `M${-width/2},${-height/2} h${width} v${height} h${-width} z`;
-            } else if (shape === "roundRect") {
-                const r = 10;
-                return `
-                    M${-width/2 + r},${-height/2}
-                    h${width - 2*r}
-                    a${r},${r} 0 0 1 ${r},${r}
-                    v${height - 2*r}
-                    a${r},${r} 0 0 1 ${-r},${r}
-                    h${-(width - 2*r)}
-                    a${r},${r} 0 0 1 ${-r},${-r}
-                    v${-(height - 2*r)}
-                    a${r},${r} 0 0 1 ${r},${-r}
-                    z
-                `;
-            }
-        }
-        
-        // 力导向图每帧更新
-        function ticked() {
-            linkElements
-                .attr("x1", d => d.source.x)
-                .attr("y1", d => d.source.y)
-                .attr("x2", d => d.target.x)
-                .attr("y2", d => d.target.y);
-                
-            nodeElements
-                .attr("transform", d => `translate(${d.x}, ${d.y})`);
-                
-            textElements
-                .attr("x", d => d.x)
-                .attr("y", d => d.y);
-        }
-        
-        // 拖拽开始
-        function dragstarted(event, d) {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-        }
-        
-        // 拖拽中
-        function dragged(event, d) {
-            d.fx = event.x;
-            d.fy = event.y;
-        }
-        
-        // 拖拽结束
-        function dragended(event, d) {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-        }
-        
-        // 节点点击
-        function nodeClicked(event, d) {
-            event.preventDefault();
-            selectNode(d);
-        }
-        
-        // 选择节点，显示属性面板
-        function selectNode(node) {
-            selectedNode = node;
-            
-            // 高亮显示选中节点
-            nodeElements.attr("stroke", d => d === node ? "#FF9800" : "#fff")
-                .attr("stroke-width", d => d === node ? 3 : 2);
-            
-            // 更新属性面板
-            nodeTextInput.value = node.text;
-            nodeColorInput.value = node.color || "#4CAF50";
-            nodeShapeInput.value = node.shape || "roundRect";
-            
-            // 显示属性面板
-            propertiesPanel.classList.remove("hidden");
-        }
-        
-        // 添加新节点
-        function addNode(parentId = null) {
-            const newNode = {
-                id: `node-${Date.now()}`,
-                text: "新节点",
-                color: "#4CAF50",
-                shape: "roundRect",
-                x: parentId ? (getNodeById(parentId).x + 100) : 0,
-                y: parentId ? (getNodeById(parentId).y + 100) : 0
-            };
-            
-            mindmapData.nodes.push(newNode);
-            
-            // 如果指定了父节点，则创建连接
-            if (parentId) {
-                mindmapData.links.push({
-                    source: parentId,
-                    target: newNode.id
-                });
-            }
-            
-            updateGraph();
-            selectNode(newNode);
-            showStatusMessage("已添加新节点");
-        }
-        
-        // 删除节点
-        function deleteNode(nodeId) {
-            // 删除所有与该节点相关的连接
-            mindmapData.links = mindmapData.links.filter(link => 
-                link.source.id !== nodeId && link.target.id !== nodeId);
-            
-            // 删除节点
-            mindmapData.nodes = mindmapData.nodes.filter(node => node.id !== nodeId);
-            
-            updateGraph();
-            propertiesPanel.classList.add("hidden");
-            selectedNode = null;
-            showStatusMessage("已删除节点");
-        }
-        
-        // 显示上下文菜单
-        function showContextMenu(event, d) {
-            event.preventDefault();
-            
-            // 更新选中节点
-            selectNode(d);
-            
-            // 显示上下文菜单在点击位置
-            contextMenu.style.left = `${event.pageX}px`;
-            contextMenu.style.top = `${event.pageY}px`;
-            contextMenu.classList.remove("hidden");
-        }
-        
-        // 通过ID获取节点
-        function getNodeById(id) {
-            return mindmapData.nodes.find(node => node.id === id);
-        }
-        
-        // 显示状态消息
-        function showStatusMessage(message) {
-            statusMessage.textContent = message;
-            setTimeout(() => {
-                statusMessage.textContent = "";
-            }, 3000);
-        }
-        
-        // 保存思维导图
-        async function saveMindmap() {
-            const data = {
-                title: titleInput.value || "未命名思维导图",
-                nodes: mindmapData.nodes,
-                links: mindmapData.links.map(link => ({
-                    source: typeof link.source === 'object' ? link.source.id : link.source,
-                    target: typeof link.target === 'object' ? link.target.id : link.target
-                }))
-            };
-            
-            try {
-                const response = await fetch(`/api/mindmap/${mapId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                if (result.success) {
-                    showStatusMessage("保存成功");
-                }
-            } catch (error) {
-                console.error('保存失败:', error);
-                showStatusMessage("保存失败");
-            }
-        }
-        
+
+        // 初始化D3
+        const width = window.innerWidth;
+        const height = window.innerHeight - 100;
+        const svg = d3.select('#mindmap-container')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
         // 加载思维导图数据
-        async function loadMindmap() {
-            try {
-                const response = await fetch(`/api/mindmap/${mapId}`);
-                const data = await response.json();
-                
-                mindmapData = data;
-                titleInput.value = data.title;
-                
-                // 确保为空思维导图添加默认中心节点
-                if (mindmapData.nodes.length === 0) {
-                    mindmapData.nodes.push({
-                        id: "center",
-                        text: "中心主题",
-                        color: "#2196F3",
-                        shape: "roundRect",
-                        x: 0,
-                        y: 0
-                    });
-                }
-                
-                updateGraph();
-                showStatusMessage("加载完成");
-            } catch (error) {
-                console.error('加载失败:', error);
-                showStatusMessage("加载失败");
+        function loadMindmap() {
+            const data = localStorage.getItem(`mindmap_${mapId}`);
+            if (data) {
+                mindmapData = JSON.parse(data);
+                document.getElementById('mindmap-title').value = mindmapData.title;
+                renderMindmap();
+            } else {
+                mindmapData = {
+                    title: '新思维导图',
+                    nodes: [{
+                        id: 'root',
+                        text: '中心主题',
+                        x: width / 2,
+                        y: height / 2,
+                        color: '#ff9900',
+                        shape: 'ellipse'
+                    }],
+                    links: []
+                };
+                renderMindmap();
             }
         }
-        
-        // 初始化
-        function init() {
-            // 初始化SVG
-            initSvg();
-            
-            // 加载数据
-            loadMindmap();
-            
-            // 添加事件监听
-            addNodeBtn.addEventListener("click", () => addNode());
-            
-            saveBtn.addEventListener("click", saveMindmap);
-            
-            closePanelBtn.addEventListener("click", () => {
-                propertiesPanel.classList.add("hidden");
-                nodeElements.attr("stroke", "#fff").attr("stroke-width", 2);
-                selectedNode = null;
-            });
-            
-            nodeTextInput.addEventListener("change", () => {
-                if (selectedNode) {
-                    selectedNode.text = nodeTextInput.value;
-                    updateGraph();
+
+        // 渲染思维导图
+        function renderMindmap() {
+            // 清空现有内容
+            svg.selectAll('*').remove();
+
+            // 绘制连接线
+            svg.selectAll('line')
+                .data(mindmapData.links)
+                .enter()
+                .append('line')
+                .attr('x1', d => {
+                    const source = mindmapData.nodes.find(n => n.id === d.source);
+                    return source.x;
+                })
+                .attr('y1', d => {
+                    const source = mindmapData.nodes.find(n => n.id === d.source);
+                    return source.y;
+                })
+                .attr('x2', d => {
+                    const target = mindmapData.nodes.find(n => n.id === d.target);
+                    return target.x;
+                })
+                .attr('y2', d => {
+                    const target = mindmapData.nodes.find(n => n.id === d.target);
+                    return target.y;
+                })
+                .attr('stroke', '#999')
+                .attr('stroke-width', 2);
+
+            // 创建节点组
+            const nodes = svg.selectAll('g')
+                .data(mindmapData.nodes)
+                .enter()
+                .append('g')
+                .attr('transform', d => `translate(${d.x},${d.y})`)
+                .call(d3.drag()
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            // 根据形状绘制节点
+            nodes.each(function(d) {
+                const node = d3.select(this);
+                if (d.shape === 'rectangle') {
+                    node.append('rect')
+                        .attr('width', 120)
+                        .attr('height', 40)
+                        .attr('x', -60)
+                        .attr('y', -20)
+                        .attr('fill', d.color || '#fff')
+                        .attr('stroke', '#000');
+                } else if (d.shape === 'ellipse') {
+                    node.append('ellipse')
+                        .attr('rx', 60)
+                        .attr('ry', 20)
+                        .attr('fill', d.color || '#fff')
+                        .attr('stroke', '#000');
+                } else if (d.shape === 'diamond') {
+                    node.append('path')
+                        .attr('d', 'M0,-20L60,0L0,20L-60,0Z')
+                        .attr('fill', d.color || '#fff')
+                        .attr('stroke', '#000');
                 }
             });
-            
-            nodeColorInput.addEventListener("change", () => {
-                if (selectedNode) {
-                    selectedNode.color = nodeColorInput.value;
-                    updateGraph();
-                }
-            });
-            
-            nodeShapeInput.addEventListener("change", () => {
-                if (selectedNode) {
-                    selectedNode.shape = nodeShapeInput.value;
-                    updateGraph();
-                }
-            });
-            
-            nodeDeleteBtn.addEventListener("click", () => {
-                if (selectedNode) {
-                    deleteNode(selectedNode.id);
-                }
-            });
-            
-            // 上下文菜单事件
-            document.getElementById("context-add-node").addEventListener("click", () => {
-                if (selectedNode) {
-                    addNode(selectedNode.id);
-                    contextMenu.classList.add("hidden");
-                }
-            });
-            
-            document.getElementById("context-edit-node").addEventListener("click", () => {
-                contextMenu.classList.add("hidden");
-            });
-            
-            document.getElementById("context-delete-node").addEventListener("click", () => {
-                if (selectedNode) {
-                    deleteNode(selectedNode.id);
-                    contextMenu.classList.add("hidden");
-                }
-            });
-            
-            // 点击画布空白处关闭上下文菜单
-            document.addEventListener("click", () => {
-                contextMenu.classList.add("hidden");
-            });
-            
-            // 窗口大小改变时重新调整
-            window.addEventListener("resize", () => {
-                width = canvas.node().clientWidth;
-                height = canvas.node().clientHeight;
-                svg.attr("viewBox", [-width/2, -height/2, width, height]);
-            });
+
+            // 添加文本
+            nodes.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', '0.3em')
+                .text(d => d.text)
+                .on('dblclick', editNodeText);
+
+            // 添加点击事件
+            nodes.on('click', selectNode);
         }
-        
-        // 启动应用
-        document.addEventListener("DOMContentLoaded", init);
+
+        // 节点拖拽处理
+        function dragged(event, d) {
+            d.x = event.x;
+            d.y = event.y;
+            d3.select(this).attr('transform', `translate(${d.x},${d.y})`);
+            
+            // 更新连接线
+            svg.selectAll('line')
+                .filter(l => l.source === d.id || l.target === d.id)
+                .attr('x1', l => {
+                    const source = mindmapData.nodes.find(n => n.id === l.source);
+                    return source.x;
+                })
+                .attr('y1', l => {
+                    const source = mindmapData.nodes.find(n => n.id === l.source);
+                    return source.y;
+                })
+                .attr('x2', l => {
+                    const target = mindmapData.nodes.find(n => n.id === l.target);
+                    return target.x;
+                })
+                .attr('y2', l => {
+                    const target = mindmapData.nodes.find(n => n.id === l.target);
+                    return target.y;
+                });
+        }
+
+        function dragended() {
+            saveMindmap();
+        }
+
+        // 选择节点
+        function selectNode(event, d) {
+            if (selectedNode === d) {
+                selectedNode = null;
+                d3.selectAll('g').classed('selected', false);
+            } else {
+                selectedNode = d;
+                d3.selectAll('g').classed('selected', false);
+                d3.select(this).classed('selected', true);
+                
+                // 更新工具栏状态
+                document.getElementById('node-color').value = d.color || '#ffffff';
+                document.getElementById('node-shape').value = d.shape || 'rectangle';
+            }
+        }
+
+        // 编辑节点文本
+        function editNodeText(event, d) {
+            const newText = prompt('输入节点文本：', d.text);
+            if (newText !== null) {
+                d.text = newText;
+                d3.select(this).text(newText);
+                saveMindmap();
+            }
+        }
+
+        // 添加新节点
+        function addNode() {
+            if (!selectedNode) {
+                alert('请先选择一个节点！');
+                return;
+            }
+
+            const newNode = {
+                id: 'node_' + Date.now(),
+                text: '新节点',
+                x: selectedNode.x + 150,
+                y: selectedNode.y,
+                color: '#ffffff',
+                shape: 'rectangle'
+            };
+
+            mindmapData.nodes.push(newNode);
+            mindmapData.links.push({
+                source: selectedNode.id,
+                target: newNode.id
+            });
+
+            renderMindmap();
+            saveMindmap();
+        }
+
+        // 删除选中的节点
+        function deleteSelectedNode() {
+            if (!selectedNode || selectedNode.id === 'root') {
+                alert('请选择要删除的非根节点！');
+                return;
+            }
+
+            mindmapData.nodes = mindmapData.nodes.filter(n => n.id !== selectedNode.id);
+            mindmapData.links = mindmapData.links.filter(l => 
+                l.source !== selectedNode.id && l.target !== selectedNode.id
+            );
+
+            selectedNode = null;
+            renderMindmap();
+            saveMindmap();
+        }
+
+        // 更新节点颜色
+        function updateNodeColor(color) {
+            if (!selectedNode) return;
+            selectedNode.color = color;
+            renderMindmap();
+            saveMindmap();
+        }
+
+        // 更新节点形状
+        function updateNodeShape(shape) {
+            if (!selectedNode) return;
+            selectedNode.shape = shape;
+            renderMindmap();
+            saveMindmap();
+        }
+
+        // 保存思维导图
+        function saveMindmap() {
+            mindmapData.title = document.getElementById('mindmap-title').value;
+            mindmapData.updated_at = new Date().toISOString();
+            
+            // 保存当前思维导图
+            localStorage.setItem(`mindmap_${mapId}`, JSON.stringify(mindmapData));
+            
+            // 更新思维导图列表
+            const mindmaps = JSON.parse(localStorage.getItem('mindmaps') || '[]');
+            const index = mindmaps.findIndex(m => m.id === mapId);
+            if (index >= 0) {
+                mindmaps[index] = {
+                    id: mapId,
+                    title: mindmapData.title,
+                    updated_at: mindmapData.updated_at
+                };
+            } else {
+                mindmaps.push({
+                    id: mapId,
+                    title: mindmapData.title,
+                    updated_at: mindmapData.updated_at
+                });
+            }
+            localStorage.setItem('mindmaps', JSON.stringify(mindmaps));
+        }
+
+        // 初始化
+        loadMindmap();
     </script>
 </body>
 </html> 
