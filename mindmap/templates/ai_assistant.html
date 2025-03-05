@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能思维助手</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .idea-card {
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+        .idea-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+        }
+        .user-message {
+            background-color: #dcf8c6;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            max-width: 80%;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .ai-message {
+            background-color: #f0f0f0;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            max-width: 80%;
+        }
+        .messages {
+            display: flex;
+            flex-direction: column;
+        }
+        .tabs {
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            background-color: #f1f1f1;
+        }
+        .tab.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .related-concept {
+            cursor: pointer;
+            padding: 5px 10px;
+            background-color: #e7f3ff;
+            border-radius: 12px;
+            margin: 5px;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+        .related-concept:hover {
+            background-color: #cce5ff;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .api-settings-alert {
+            margin-bottom: 20px;
+            display: none;
+        }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="toolbar">
+            <h1>智能思维助手</h1>
+            <a href="{{ url_for('settings_page') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-gear"></i> 设置
+            </a>
+        </div>
+        
+        <div id="api-settings-alert" class="alert alert-warning api-settings-alert">
+            <strong>未配置API密钥！</strong> 您正在使用模拟数据。要获取真实AI响应，请在<a href="{{ url_for('settings_page') }}">设置页面</a>配置您的API密钥。
+        </div>
+        
+        <div class="tabs d-flex">
+            <div class="tab active" data-tab="idea-expander">想法扩展</div>
+            <div class="tab" data-tab="ai-chat">AI对话</div>
+        </div>
+        
+        <div id="idea-expander" class="tab-content active">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5>快速记录想法</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="idea-form">
+                                <div class="mb-3">
+                                    <label for="idea" class="form-label">输入您的想法或关键词</label>
+                                    <textarea class="form-control" id="idea" rows="3" placeholder="例如：学习新语言、改善工作效率、开发创新产品..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">AI扩展想法</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div id="loading-idea" class="loading">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">正在加载...</span>
+                        </div>
+                        <p>AI正在思考中...</p>
+                    </div>
+                    
+                    <div id="expanded-idea" style="display:none;">
+                        <div class="card idea-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 id="idea-title"></h5>
+                                <button id="create-mindmap-btn" class="btn btn-success btn-sm">创建思维导图</button>
+                            </div>
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">概念摘要</h6>
+                                <p id="idea-summary" class="card-text"></p>
+                                
+                                <hr>
+                                
+                                <h6 class="card-subtitle mb-2 text-muted">详细解释</h6>
+                                <p id="idea-details" class="card-text"></p>
+                                
+                                <hr>
+                                
+                                <h6 class="card-subtitle mb-2 text-muted">相关概念</h6>
+                                <div id="related-concepts"></div>
+                                
+                                <hr>
+                                
+                                <h6 class="card-subtitle mb-2 text-muted">行动项</h6>
+                                <ul id="action-items" class="list-group list-group-flush"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="ai-chat" class="tab-content">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>AI对话</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chat-container">
+                                <div class="messages" id="chat-messages">
+                                    <div class="ai-message">
+                                        您好！我是您的智能思维助手。您可以向我提问，也可以让我帮您发展想法。
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="loading-chat" class="loading">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">正在加载...</span>
+                                </div>
+                                <p>AI正在思考中...</p>
+                            </div>
+                            
+                            <form id="chat-form">
+                                <div class="input-group">
+                                    <input type="text" id="chat-input" class="form-control" placeholder="输入您的问题或想法...">
+                                    <button class="btn btn-primary" type="submit">发送</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <nav class="navbar fixed-bottom navbar-light bg-light">
+        <div class="container-fluid">
+            <a href="/" class="btn btn-outline-secondary">返回思维导图</a>
+        </div>
+    </nav>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 当前对话ID
+        let currentChatId = '';
+        // 存储扩展后的想法数据
+        let expandedIdeaData = null;
+        
+        // 初始化检查API设置
+        document.addEventListener('DOMContentLoaded', function() {
+            const apiKey = localStorage.getItem('deepseek_api_key');
+            const apiSettingsAlert = document.getElementById('api-settings-alert');
+            
+            if (!apiKey || apiKey.trim() === '') {
+                apiSettingsAlert.style.display = 'block';
+            }
+        });
+        
+        // 切换标签页
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // 移除所有标签的active类
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                // 添加当前标签的active类
+                this.classList.add('active');
+                
+                // 隐藏所有内容
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // 显示对应内容
+                const tabId = this.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+        
+        // 想法扩展表单提交
+        document.getElementById('idea-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const idea = document.getElementById('idea').value.trim();
+            if (!idea) {
+                alert('请输入想法');
+                return;
+            }
+            
+            // 获取API密钥
+            const apiKey = localStorage.getItem('deepseek_api_key') || '';
+            const useMockData = localStorage.getItem('use_mock_data') === 'true';
+            
+            // 显示加载状态
+            document.getElementById('loading-idea').style.display = 'block';
+            document.getElementById('expanded-idea').style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/expand-idea', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': apiKey
+                    },
+                    body: JSON.stringify({ 
+                        idea: idea,
+                        use_mock_data: useMockData
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(`错误: ${data.error}`);
+                    return;
+                }
+                
+                // 保存扩展数据
+                expandedIdeaData = data;
+                
+                // 填充扩展想法内容
+                document.getElementById('idea-title').textContent = data.title || '未命名想法';
+                document.getElementById('idea-summary').textContent = data.summary || '无摘要';
+                document.getElementById('idea-details').textContent = data.details || '无详细信息';
+                
+                // 填充相关概念
+                const relatedConceptsContainer = document.getElementById('related-concepts');
+                relatedConceptsContainer.innerHTML = '';
+                
+                if (data.related_concepts && data.related_concepts.length > 0) {
+                    data.related_concepts.forEach(concept => {
+                        const conceptSpan = document.createElement('span');
+                        conceptSpan.className = 'related-concept';
+                        conceptSpan.textContent = concept;
+                        conceptSpan.addEventListener('click', function() {
+                            document.getElementById('idea').value = concept;
+                            document.getElementById('idea-form').dispatchEvent(new Event('submit'));
+                        });
+                        relatedConceptsContainer.appendChild(conceptSpan);
+                    });
+                } else {
+                    relatedConceptsContainer.textContent = '无相关概念';
+                }
+                
+                // 填充行动项
+                const actionItemsContainer = document.getElementById('action-items');
+                actionItemsContainer.innerHTML = '';
+                
+                if (data.action_items && data.action_items.length > 0) {
+                    data.action_items.forEach(item => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.textContent = item;
+                        actionItemsContainer.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item';
+                    li.textContent = '无行动项';
+                    actionItemsContainer.appendChild(li);
+                }
+                
+                // 显示扩展结果
+                document.getElementById('expanded-idea').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('处理请求时出错，请重试');
+            } finally {
+                // 隐藏加载状态
+                document.getElementById('loading-idea').style.display = 'none';
+            }
+        });
+        
+        // 创建思维导图
+        document.getElementById('create-mindmap-btn').addEventListener('click', async function() {
+            if (!expandedIdeaData) {
+                alert('请先扩展一个想法');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/create-mindmap-from-idea', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ expanded_idea: expandedIdeaData })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(`错误: ${data.error}`);
+                    return;
+                }
+                
+                if (data.success && data.map_id) {
+                    // 重定向到新创建的思维导图
+                    window.location.href = `/mindmap/${data.map_id}`;
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('处理请求时出错，请重试');
+            }
+        });
+        
+        // 聊天表单提交
+        document.getElementById('chat-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const message = document.getElementById('chat-input').value.trim();
+            if (!message) {
+                return;
+            }
+            
+            // 获取API密钥
+            const apiKey = localStorage.getItem('deepseek_api_key') || '';
+            const useMockData = localStorage.getItem('use_mock_data') === 'true';
+            
+            // 添加用户消息到聊天窗口
+            addMessage(message, 'user');
+            
+            // 清空输入框
+            document.getElementById('chat-input').value = '';
+            
+            // 显示加载状态
+            document.getElementById('loading-chat').style.display = 'block';
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': apiKey
+                    },
+                    body: JSON.stringify({ 
+                        message: message,
+                        chat_id: currentChatId,
+                        use_mock_data: useMockData
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(`错误: ${data.error}`);
+                    return;
+                }
+                
+                // 更新当前对话ID
+                currentChatId = data.chat_id;
+                
+                // 添加AI回复到聊天窗口
+                addMessage(data.message, 'ai');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('处理请求时出错，请重试');
+            } finally {
+                // 隐藏加载状态
+                document.getElementById('loading-chat').style.display = 'none';
+            }
+        });
+        
+        // 添加消息到聊天窗口
+        function addMessage(message, type) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type === 'user' ? 'user-message' : 'ai-message';
+            messageDiv.textContent = message;
+            messagesContainer.appendChild(messageDiv);
+            
+            // 滚动到底部
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html> 

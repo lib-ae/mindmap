@@ -1,0 +1,1 @@
+web: cd mindmap && gunicorn app:app 
