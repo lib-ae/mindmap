@@ -1,0 +1,249 @@
+/* 思维导图编辑页面样式 */
+.page-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+}
+
+.app-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.home-link {
+    color: var(--text-color);
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+}
+
+.home-link:hover {
+    color: var(--primary-color);
+}
+
+.home-link::before {
+    content: "←";
+    margin-right: 5px;
+}
+
+#mindmap-title {
+    border: none;
+    border-bottom: 1px solid transparent;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 5px 0;
+    background-color: transparent;
+    width: 300px;
+}
+
+#mindmap-title:focus {
+    border-bottom: 1px solid var(--primary-color);
+    outline: none;
+}
+
+.tools {
+    display: flex;
+    gap: 10px;
+}
+
+.tool-btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    background-color: #e0e0e0;
+    color: var(--text-color);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.tool-btn:hover {
+    background-color: #d0d0d0;
+}
+
+.tool-btn.primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.tool-btn.primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.mindmap-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+}
+
+#mindmap-canvas {
+    flex: 1;
+    height: 100%;
+    background-color: #fafafa;
+    background-image: 
+        linear-gradient(rgba(150, 150, 150, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(150, 150, 150, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* 节点和连接线样式 */
+.node {
+    cursor: pointer;
+    transition: fill 0.2s, stroke 0.2s;
+}
+
+.node:hover {
+    filter: brightness(1.1);
+}
+
+.link {
+    stroke-opacity: 0.6;
+    transition: stroke-opacity 0.2s;
+}
+
+.node-text {
+    font-size: 14px;
+    font-weight: 500;
+    pointer-events: none;
+}
+
+/* 右侧属性面板 */
+#properties-panel {
+    width: 280px;
+    background-color: white;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    transition: transform 0.3s;
+    overflow-y: auto;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h3 {
+    margin: 0;
+}
+
+#close-panel-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--lighter-text);
+}
+
+#close-panel-btn:hover {
+    color: var(--text-color);
+}
+
+.panel-content {
+    padding: 15px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* 上下文菜单 */
+.context-menu {
+    position: absolute;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    min-width: 150px;
+}
+
+.context-menu ul {
+    list-style: none;
+}
+
+.context-menu li {
+    padding: 10px 15px;
+    cursor: pointer;
+}
+
+.context-menu li:hover {
+    background-color: #f0f0f0;
+}
+
+/* 状态栏 */
+#status-bar {
+    padding: 8px 16px;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--light-text);
+}
+
+#status-message {
+    font-weight: 500;
+}
+
+/* 适应移动设备 */
+@media (max-width: 768px) {
+    .toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px;
+    }
+    
+    .app-info {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .tools {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    #properties-panel {
+        position: fixed;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 80%;
+        max-width: 280px;
+        transform: translateX(100%);
+    }
+    
+    #properties-panel.active {
+        transform: translateX(0);
+    }
+} 
